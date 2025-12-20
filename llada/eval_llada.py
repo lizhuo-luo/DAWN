@@ -18,6 +18,7 @@
 '''
 This file is inspired by the code from https://github.com/ML-GSAI/SMDM
 '''
+import os
 import accelerate
 import torch
 import re
@@ -67,6 +68,8 @@ class LLaDAEvalHarness(LM):
         save_dir=None,
         show_speed=False,
         dual_cache=False,
+        g_dllm=False,
+        outp_path=None,
         **kwargs,
     ):
         '''
@@ -132,6 +135,8 @@ class LLaDAEvalHarness(LM):
         self.save_dir = save_dir
         self.show_speed = show_speed
         self.dual_cache = dual_cache
+        self.g_dllm = g_dllm
+        self.outp_path = outp_path
     @property
     def rank(self):
         return self._rank
@@ -345,7 +350,7 @@ class LLaDAEvalHarness(LM):
                                         temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor)
             else:
                 generated_answer, nfe = generate(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, block_length=self.block_length, 
-                                        temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor)
+                                        temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor, g_dllm=self.g_dllm)
 
             if self.is_instruct and 'task_id' in req.doc and str(req.doc['task_id']).lower().startswith('humaneval'):
                 generated_answer_ids = generated_answer[:, input_ids.shape[1]:]
@@ -386,10 +391,27 @@ class LLaDAEvalHarness(LM):
             # self.accelerator.wait_for_everyone()
         end_time = time.time()
         if self.show_speed:
-            print(f"Total number of tokens generated: {num_tokens}")
-            print(f"Total time taken: {end_time - start_time} seconds")
-            print(f"Tokens per second: {num_tokens / (end_time - start_time)}")
-            print(f"Total NFE is {num_nfe}")
+            # print(f"Total number of tokens generated: {num_tokens}")
+            # print(f"Total time taken: {end_time - start_time} seconds")
+            # print(f"Tokens per second: {num_tokens / (end_time - start_time)}")
+            # print(f"Total NFE is {num_nfe}")
+
+            dirpath = os.path.dirname(self.outp_path)
+            if dirpath:
+                os.makedirs(dirpath, exist_ok=True)
+
+            with open(self.outp_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(
+                    {
+                        'Total Number of Tokens': num_tokens.item(),
+                        'Total Time Taken': end_time - start_time,
+                        'Tokens per Second': num_tokens.item() / (end_time - start_time),
+                        'Total NFE': num_nfe,
+                        'Tokens per NFE': num_tokens.item() / num_nfe,
+                        'Average NFE': num_nfe / len(output),
+                    },
+                    ensure_ascii=False
+                ) + "\n")
             
         return output
 
