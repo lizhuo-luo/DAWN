@@ -400,10 +400,13 @@ class LLaDAEvalHarness(LM):
             # self.accelerator.wait_for_everyone()
         end_time = time.time()
         if self.show_speed:
-            # print(f"Total number of tokens generated: {num_tokens}")
-            # print(f"Total time taken: {end_time - start_time} seconds")
-            # print(f"Tokens per second: {num_tokens / (end_time - start_time)}")
-            # print(f"Total NFE is {num_nfe}")
+            print(f"Total number of tokens generated: {num_tokens}")
+            print(f"Total time taken: {end_time - start_time} seconds")
+            print(f"Tokens per second: {num_tokens / (end_time - start_time)}")
+            print(f"Total NFE is {num_nfe}")
+            print(f"Tokens per NFE is {num_tokens / num_nfe}")
+            print(f"Average NFE is {num_nfe / len(output)}")
+
 
             dirpath = os.path.dirname(self.outp_path)
             if dirpath:
