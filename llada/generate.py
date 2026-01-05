@@ -433,7 +433,8 @@ def get_transfer_index_dynamic(logits, temperature, remasking, mask_index, x, nu
 def get_transfer_index_g(logits, temperature, remasking, mask_index, x, num_transfer_tokens, avg_attn_scores, conf_arch, threshold_e=0.1, threshold_d=0.9, threshold_c=0.7):
     # attn sink removal
     assert avg_attn_scores is not None, 'avg_attn_scores is None'
-    sink_mask = detect_attn_sinks(avg_attn_scores, topk=3)
+    # sink_mask = detect_attn_sinks(avg_attn_scores, topk=3)
+    sink_mask = detect_attn_sinks_(avg_attn_scores, threshold=0.02)
     key_sink_mask = sink_mask.unsqueeze(1)      # [B, 1, L]
     avg_attn_scores = avg_attn_scores.masked_fill(key_sink_mask, 0.0)  # [B, L, L]
 

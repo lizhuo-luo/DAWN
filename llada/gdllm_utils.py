@@ -4,6 +4,9 @@ import torch.nn.functional as F
 
 from transformers import AutoTokenizer, AutoModel
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 def select_parallel_tokens_conflict_mis(edge_mask, node_mask, confidence, max_parallel=None):
     K = node_mask.sum().item()
     if K == 0:
@@ -43,3 +46,14 @@ def detect_attn_sinks(attn_scores, ratio=None, topk=None):
         _, idx = torch.topk(barA, k=k, dim=-1)
         global_mask.scatter_(1, idx, True)
     return global_mask
+
+def detect_attn_sinks_(attn_scores, threshold=0.05):
+    """
+    attn_scores: [B, S, S] softmax attention
+    """
+    B, S, _ = attn_scores.shape
+
+    # column mean
+    barA = attn_scores.mean(dim=1)          # [B, S]
+    return barA > threshold
+
