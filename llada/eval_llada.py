@@ -365,6 +365,8 @@ class LLaDAEvalHarness(LM):
                 generated_answer, nfe = generate(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, block_length=self.block_length, 
                                         temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor, g_dllm=self.g_dllm, local_leap=self.local_leap, threshold_c=self.threshold_c)
 
+            torch.cuda.empty_cache()
+            
             if self.is_instruct and 'task_id' in req.doc and str(req.doc['task_id']).lower().startswith('humaneval'):
                 generated_answer_ids = generated_answer[:, input_ids.shape[1]:]
                 if self.show_speed:
