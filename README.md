@@ -1,11 +1,8 @@
 <div align="center">
 
 ![logo](asset/logo.png)
-<h1></h1>
 
-<h3>DAWN: Dependency-Aware Fast Inference for Diffusion LLMs (Paper Coming Soon)</h3>
-
-<h1></h1>
+<h1>DAWN: Dependency-Aware Fast Inference for Diffusion LLMs (Paper Coming Soon)</h1>
 
 </div>
 
