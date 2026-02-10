@@ -4,6 +4,9 @@
 
 <h1>DAWN: Dependency-Aware Fast Inference for Diffusion LLMs (Paper Coming Soon)</h1>
 
+[![arXiv](https://img.shields.io/badge/Paper-arXiv-red.svg)](https://arxiv.org/abs/2602.06953)
+[![license](https://img.shields.io/badge/License-MIT%202.0-blue)](./LICENSE)
+
 </div>
 
 DAWN is a **training-free**, **dependency-aware** decoding method for fast dLLM inference.
@@ -52,7 +55,19 @@ The main experiment is conducted on an Nvidia H100 80 GPU, DAWN exhibits efficie
 
 ## 🎓 Citation
 
-Coming Soon...
+Thank you for citing this work if it helps your research!
+
+```bibtex
+@misc{dawn,
+      title={DAWN: Dependency-Aware Fast Inference for Diffusion LLMs}, 
+      author={Lizhuo Luo and Zhuoran Shi and Jiajun Luo and Zhi Wang and Shen Ren and Wenya Wang and Tianwei Zhang},
+      year={2026},
+      eprint={2602.06953},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2602.06953}, 
+}
+```
 
 ## 🙏 Acknowledgements
 
