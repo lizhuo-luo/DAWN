@@ -17,29 +17,36 @@ COLOR_MAP = {
 }
 
 
-def build_state(now_ids, decode_token, mask_id):
-    """One frame: list of (token_text, label) over the answer window.
+def build_state(now_ids, decode_token, mask_id, eos_id=None):
+    """One frame over the answer window, truncated at the first committed EOS.
 
-    Every position is either masked ([MASK]) or committed (its decoded token).
+    Returns (state, eff): the (token_text, label) list to display (only the
+    tokens before the first EOS), and the number of effective committed tokens
+    shown (non-mask, non-EOS) — used for the tokens/sec metric.
     """
     state = []
+    eff = 0
     for tid in now_ids:
+        if eos_id is not None and tid == eos_id:
+            break  # stop at the first EOS — don't show it or anything after
         if tid == mask_id:
             state.append(("[MASK]", LABEL_MASK))
         else:
             state.append((decode_token(tid), LABEL_COMMITTED))
-    return state
+            eff += 1
+    return state, eff
 
 
-def frames_from_snapshots(xs, prompt_len, gen_len, decode_token, mask_id):
-    """Build the full frame list from raw snapshots collected during generation.
+def frames_from_snapshots(xs, prompt_len, gen_len, decode_token, mask_id, eos_id=None):
+    """Build the frame list from raw snapshots collected during generation.
 
     xs: list of (1, L) long tensors (one per step, plus an initial all-masked one).
+    Returns a list of (state, eff) tuples.
     """
     frames = []
     for x in xs:
         now = x[0, prompt_len:prompt_len + gen_len].tolist()
-        frames.append(build_state(now, decode_token, mask_id))
+        frames.append(build_state(now, decode_token, mask_id, eos_id))
     return frames
 
 
@@ -64,10 +71,14 @@ def stats_md(title, method_name, nfe, elapsed, gen_length, speedup=None, finishe
     return "\n\n".join(lines)
 
 
-def stats_html(title, method_name, nfe, elapsed, gen_length,
+def stats_html(title, method_name, nfe, elapsed, n_tokens,
                speedup=None, finished=False, accent="opp"):
-    """Styled stat card (rendered in a gr.HTML component)."""
-    toks_per_s = (gen_length / elapsed) if elapsed > 0 else 0.0
+    """Styled stat card (rendered in a gr.HTML component).
+
+    n_tokens is the number of *effective* tokens (before the first EOS); tok/s
+    is computed from it.
+    """
+    toks_per_s = (n_tokens / elapsed) if elapsed > 0 else 0.0
     chk = '<span class="dawn-stat__chk">✓</span>' if finished else ""
     speed = (
         f'<div class="dawn-speedup">🏁 {speedup:.2f}× faster</div>'

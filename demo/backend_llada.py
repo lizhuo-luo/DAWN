@@ -55,6 +55,7 @@ class LladaBackend:
             .eval()
         )
         self.decode_token = make_decode_token(self.tokenizer)
+        self.eos_id = self.tokenizer.eos_token_id
 
     def unload(self):
         del self.model
@@ -111,7 +112,8 @@ class LladaBackend:
         compute_time = 0.0
 
         # initial all-masked frame
-        yield {"state": build_state(window(), self.decode_token, MASK_ID),
+        state, eff = build_state(window(), self.decode_token, MASK_ID, self.eos_id)
+        yield {"state": state, "eff": eff,
                "nfe": 0, "e2e": 0.0, "answer": None, "done": False}
 
         for num_block in range(num_blocks):
@@ -164,7 +166,8 @@ class LladaBackend:
                     ).strip()
                     if done else None
                 )
-                yield {"state": build_state(window(), self.decode_token, MASK_ID),
+                state, eff = build_state(window(), self.decode_token, MASK_ID, self.eos_id)
+                yield {"state": state, "eff": eff,
                        "nfe": nfe, "e2e": compute_time, "answer": answer, "done": done}
                 if block_done:
                     break

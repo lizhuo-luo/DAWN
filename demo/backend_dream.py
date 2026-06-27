@@ -65,6 +65,7 @@ class DreamBackend:
             or DREAM_MASK_FALLBACK
         )
         self.decode_token = make_decode_token(self.tokenizer)
+        self.eos_id = self.tokenizer.eos_token_id
 
     def unload(self):
         del self.model
@@ -130,7 +131,7 @@ class DreamBackend:
 
         sequences = out.sequences if hasattr(out, "sequences") else out
         frames = frames_from_snapshots(
-            xs, prompt_len, gen_length, self.decode_token, self.mask_id
+            xs, prompt_len, gen_length, self.decode_token, self.mask_id, self.eos_id
         )
         answer_ids = sequences[0][prompt_len:].tolist()
         answer = self.tokenizer.decode(answer_ids, skip_special_tokens=True)
@@ -140,10 +141,11 @@ class DreamBackend:
         answer = answer.strip()
 
         n = len(frames)
-        for k, frame in enumerate(frames):
+        for k, (state, eff) in enumerate(frames):
             done = k == n - 1
             yield {
-                "state": frame,
+                "state": state,
+                "eff": eff,
                 "nfe": min(k, nfe),
                 "e2e": e2e if done else e2e * (k + 1) / max(n, 1),
                 "answer": answer if done else None,

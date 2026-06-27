@@ -113,11 +113,34 @@ def opponent_label(opponent):
     return "Vanilla (1 token/step)" if opponent == "vanilla" else "Parallel-threshold"
 
 
-def _idle_stats(gen_length, opp_name):
+# DAWN hyper-parameters exactly as used in the eval scripts. LLaDA's dawn path
+# uses tau_low (conf_threshold unused); Dream's dawn path uses conf_threshold
+# (tau_low unused). tau_low is task-dependent in the LLaDA eval (0.7–0.8); 0.75
+# is the representative value. tau_sink/edge/induce differ between the two models.
+DAWN_PRESETS = {
+    "LLaDA-8B-Instruct": dict(tau_sink=0.01, tau_edge=0.07, tau_induce=0.7,  tau_low=0.75, conf_threshold=0.8),
+    "LLaDA-1.5":         dict(tau_sink=0.01, tau_edge=0.07, tau_induce=0.7,  tau_low=0.75, conf_threshold=0.8),
+    "Dream-7B (Instruct)": dict(tau_sink=0.03, tau_edge=0.10, tau_induce=0.75, tau_low=0.7,  conf_threshold=0.8),
+}
+
+
+def _apply_preset(model_key):
+    p = DAWN_PRESETS.get(model_key, DAWN_PRESETS[DEFAULT_MODEL])
+    return p["tau_sink"], p["tau_edge"], p["tau_induce"], p["tau_low"], p["conf_threshold"]
+
+
+def _idle_stats(opp_name):
     return (
-        stats_html("Opponent", opp_name, 0, 0.0, gen_length, accent="opp"),
-        stats_html("DAWN", "dependency-aware", 0, 0.0, gen_length, accent="dawn"),
+        stats_html("Opponent", opp_name, 0, 0.0, 0, accent="opp"),
+        stats_html("DAWN", "dependency-aware", 0, 0.0, 0, accent="dawn"),
     )
+
+
+def _speedup(opp_eff, opp_e2e, dawn_eff, dawn_e2e):
+    """Speedup defined by throughput: DAWN tok/s divided by opponent tok/s."""
+    opp_tps = (opp_eff / opp_e2e) if opp_e2e > 0 else 0.0
+    dawn_tps = (dawn_eff / dawn_e2e) if dawn_e2e > 0 else 0.0
+    return (dawn_tps / opp_tps) if opp_tps > 0 else None
 
 
 def run_race(
@@ -145,7 +168,7 @@ def run_race(
     def emit(left, right, lstat, rstat, status):
         return left, right, lstat, rstat, status
 
-    idle_l, idle_r = _idle_stats(gen_length, opp_name)
+    idle_l, idle_r = _idle_stats(opp_name)
 
     # ---- load model (may swap the resident one) -------------------------------
     yield emit(empty, empty, idle_l, idle_r,
@@ -154,14 +177,14 @@ def run_race(
 
     # ---- opponent (streamed live) ---------------------------------------------
     of = []
-    opp_nfe, opp_e2e = 0, 0.0
+    opp_nfe, opp_e2e, opp_eff = 0, 0.0, 0
     opp_stat = idle_l
     yield emit(empty, empty, idle_l, idle_r,
                status_html(f"▶️ Racing <b>{opp_name}</b> …", "run"))
     for upd in backend.run_stream(message, [], {**common, "method": opponent}):
         of.append(upd["state"])
-        opp_nfe, opp_e2e = upd["nfe"], upd["e2e"]
-        opp_stat = stats_html("Opponent", opp_name, opp_nfe, opp_e2e, gen_length,
+        opp_nfe, opp_e2e, opp_eff = upd["nfe"], upd["e2e"], upd["eff"]
+        opp_stat = stats_html("Opponent", opp_name, opp_nfe, opp_e2e, opp_eff,
                               finished=upd["done"], accent="opp")
         yield emit(upd["state"], empty, opp_stat, idle_r,
                    status_html(f"▶️ Opponent (<b>{opp_name}</b>) denoising …", "run"))
@@ -170,25 +193,25 @@ def run_race(
 
     # ---- DAWN (streamed live) -------------------------------------------------
     df = []
-    dawn_nfe, dawn_e2e = 0, 0.0
+    dawn_nfe, dawn_e2e, dawn_eff = 0, 0.0, 0
     dawn_stat = idle_r
     opp_final = of[-1] if of else empty
     for upd in backend.run_stream(message, [], {**common, "method": "dawn"}):
         df.append(upd["state"])
-        dawn_nfe, dawn_e2e = upd["nfe"], upd["e2e"]
-        sp = (opp_e2e / dawn_e2e) if dawn_e2e > 0 else None
+        dawn_nfe, dawn_e2e, dawn_eff = upd["nfe"], upd["e2e"], upd["eff"]
+        sp = _speedup(opp_eff, opp_e2e, dawn_eff, dawn_e2e)
         dawn_stat = stats_html("DAWN", "dependency-aware", dawn_nfe, dawn_e2e,
-                               gen_length, speedup=sp, finished=upd["done"], accent="dawn")
+                               dawn_eff, speedup=sp, finished=upd["done"], accent="dawn")
         yield emit(opp_final, upd["state"], opp_stat, dawn_stat,
                    status_html("▶️ DAWN denoising …", "run"))
         if viz_delay > 0:
             time.sleep(viz_delay)
 
-    speedup = (opp_e2e / dawn_e2e) if dawn_e2e > 0 else None
-    opp_stat = stats_html("Opponent", opp_name, opp_nfe, opp_e2e, gen_length,
+    speedup = _speedup(opp_eff, opp_e2e, dawn_eff, dawn_e2e)
+    opp_stat = stats_html("Opponent", opp_name, opp_nfe, opp_e2e, opp_eff,
                           finished=True, accent="opp")
     dawn_stat = stats_html("DAWN", "dependency-aware", dawn_nfe, dawn_e2e,
-                           gen_length, speedup=speedup, finished=True, accent="dawn")
+                           dawn_eff, speedup=speedup, finished=True, accent="dawn")
 
     # ---- settle on final state -------------------------------------------------
     winner = "DAWN" if (speedup and speedup >= 1) else "Opponent"
@@ -200,7 +223,7 @@ def run_race(
 
 
 def clear_all():
-    idle_l, idle_r = _idle_stats(1, "—")
+    idle_l, idle_r = _idle_stats("—")
     return [], [], idle_l, idle_r, "", status_html("Ready when you are.", "info")
 
 
@@ -226,7 +249,7 @@ def build_demo():
             opponent = gr.Dropdown(
                 choices=[("Vanilla (1 token/step)", "vanilla"),
                          ("Parallel-threshold", "parallel")],
-                value="parallel", label="Opponent", scale=2,
+                value="vanilla", label="Opponent", scale=2,
             )
 
         with gr.Row():
@@ -255,14 +278,14 @@ def build_demo():
                     tau_sink = gr.Slider(0.0, 0.2, value=0.01, step=0.005, label="tau_sink")
                     tau_edge = gr.Slider(0.0, 0.5, value=0.07, step=0.01, label="tau_edge")
                     tau_induce = gr.Slider(0.0, 1.0, value=0.7, step=0.05, label="tau_induce")
-                    tau_low = gr.Slider(0.0, 1.0, value=0.7, step=0.05,
+                    tau_low = gr.Slider(0.0, 1.0, value=0.75, step=0.05,
                                         label="tau_low (LLaDA)")
                     conf_threshold = gr.Slider(0.0, 1.0, value=0.8, step=0.05,
                                                label="conf_threshold (Dream)")
 
         status = gr.HTML(status_html("Ready when you are.", "info"))
 
-        idle_l, idle_r = _idle_stats(1, "—")
+        idle_l, idle_r = _idle_stats("—")
         with gr.Row(equal_height=True):
             with gr.Column(scale=10, elem_classes="dawn-lane dawn-lane--opp"):
                 left_stats = gr.HTML(idle_l)
@@ -283,6 +306,12 @@ def build_demo():
             conf_threshold,
         ]
         outputs = [left_vis, right_vis, left_stats, right_stats, status]
+
+        # switching model resets DAWN's tau/conf to that model's eval preset
+        model_key.change(
+            _apply_preset, model_key,
+            [tau_sink, tau_edge, tau_induce, tau_low, conf_threshold],
+        )
 
         send_btn.click(run_race, inputs=inputs, outputs=outputs).then(
             lambda: "", None, msg
