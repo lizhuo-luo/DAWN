@@ -4,9 +4,8 @@
 # a diffusion LLM. A model selector switches between LLaDA and Dream; only one
 # model is resident at a time (single-GPU friendly), generation is sequential,
 # and each panel reports its own end-to-end (e2e) wall-clock time, step count
-# (NFE) and tokens/sec. DAWN's panel also shows the speedup factor. An optional
-# synchronized replay animates both panels on a shared real-time clock so DAWN
-# visibly finishes first.
+# (NFE) and tokens/sec. DAWN's panel also shows the speedup factor. Each lane is
+# animated once, live, as it generates (opponent first, then DAWN).
 #
 # Run:   python app.py        (from the repo root)
 # Needs: a CUDA GPU (~16GB+ for the 7-8B models in bf16) and the demo deps
@@ -83,15 +82,17 @@ CSS = """
 }
 .dawn-stat__method {
   display:inline-block; font-family: ui-monospace, monospace; font-size: 12px;
-  color:#6b7280; background: var(--neutral-100); padding: 2px 8px; border-radius: 6px;
+  color:#9ca3af; background: rgba(128,128,128,.16); padding: 2px 8px; border-radius: 6px;
   margin: 6px 0 10px;
 }
 .dawn-stat__tiles {display:flex; gap:10px;}
+/* mode-agnostic translucent tiles: a subtle gray overlay reads correctly on
+   both light and dark themes, and body-text-color always contrasts the page. */
 .dawn-tile {
   flex:1; text-align:center; padding: 10px 6px; border-radius: 12px;
-  background: var(--neutral-100); border:1px solid var(--border-color-primary);
+  background: rgba(128,128,128,.14); border:1px solid rgba(128,128,128,.24);
 }
-.dawn-stat--dawn .dawn-tile {background: rgba(124,58,237,.08); border-color: rgba(124,58,237,.18);}
+.dawn-stat--dawn .dawn-tile {background: rgba(124,58,237,.12); border-color: rgba(124,58,237,.30);}
 .dawn-tile__v {font-size: 22px; font-weight: 800; line-height: 1; color: var(--body-text-color);}
 .dawn-tile__v span {font-size: 13px; font-weight:600; opacity:.6; margin-left:1px;}
 .dawn-tile__l {font-size: 11px; text-transform: uppercase; letter-spacing:.06em;
@@ -122,7 +123,7 @@ def _idle_stats(gen_length, opp_name):
 def run_race(
     message, model_key, opponent, gen_length, block_length, threshold,
     temperature, top_p, viz_delay, tau_sink, tau_edge, tau_induce, tau_low,
-    conf_threshold, do_replay,
+    conf_threshold,
 ):
     if not message or not message.strip():
         raise gr.Error("Please enter a prompt.")
@@ -164,6 +165,8 @@ def run_race(
                               finished=upd["done"], accent="opp")
         yield emit(upd["state"], empty, opp_stat, idle_r,
                    status_html(f"▶️ Opponent (<b>{opp_name}</b>) denoising …", "run"))
+        if viz_delay > 0:
+            time.sleep(viz_delay)
 
     # ---- DAWN (streamed live) -------------------------------------------------
     df = []
@@ -178,33 +181,14 @@ def run_race(
                                gen_length, speedup=sp, finished=upd["done"], accent="dawn")
         yield emit(opp_final, upd["state"], opp_stat, dawn_stat,
                    status_html("▶️ DAWN denoising …", "run"))
+        if viz_delay > 0:
+            time.sleep(viz_delay)
 
     speedup = (opp_e2e / dawn_e2e) if dawn_e2e > 0 else None
     opp_stat = stats_html("Opponent", opp_name, opp_nfe, opp_e2e, gen_length,
                           finished=True, accent="opp")
     dawn_stat = stats_html("DAWN", "dependency-aware", dawn_nfe, dawn_e2e,
                            gen_length, speedup=speedup, finished=True, accent="dawn")
-
-    # ---- optional synchronized replay on a shared real-time clock --------------
-    if do_replay and of and df:
-        n_o, n_d = len(of), len(df)
-        total = max(opp_e2e, dawn_e2e)
-        TICKS = 60
-        for t in range(TICKS + 1):
-            cur = (t / TICKS) * total
-            oi = min(n_o - 1, int(cur / opp_e2e * n_o)) if opp_e2e > 0 else n_o - 1
-            di = min(n_d - 1, int(cur / dawn_e2e * n_d)) if dawn_e2e > 0 else n_d - 1
-            yield emit(
-                of[oi], df[di],
-                stats_html("Opponent", opp_name, opp_nfe, opp_e2e, gen_length,
-                           finished=(oi == n_o - 1), accent="opp"),
-                stats_html("DAWN", "dependency-aware", dawn_nfe, dawn_e2e,
-                           gen_length, speedup=speedup, finished=(di == n_d - 1),
-                           accent="dawn"),
-                status_html("🏁 Racing… <i>(real-time replay)</i>", "run"),
-            )
-            if viz_delay > 0:
-                time.sleep(viz_delay)
 
     # ---- settle on final state -------------------------------------------------
     winner = "DAWN" if (speedup and speedup >= 1) else "Opponent"
@@ -265,8 +249,7 @@ def build_demo():
                                   label="top_p (Dream, temp>0)")
             with gr.Row():
                 viz_delay = gr.Slider(0.0, 0.3, value=0.05, step=0.01,
-                                      label="replay delay (s/frame)")
-                do_replay = gr.Checkbox(value=True, label="Synchronized real-time replay")
+                                      label="animation delay (s/frame)")
             with gr.Accordion("DAWN advanced (tau / conf)", open=False):
                 with gr.Row():
                     tau_sink = gr.Slider(0.0, 0.2, value=0.01, step=0.005, label="tau_sink")
@@ -297,7 +280,7 @@ def build_demo():
         inputs = [
             msg, model_key, opponent, gen_length, block_length, threshold,
             temperature, top_p, viz_delay, tau_sink, tau_edge, tau_induce, tau_low,
-            conf_threshold, do_replay,
+            conf_threshold,
         ]
         outputs = [left_vis, right_vis, left_stats, right_stats, status]
 
