@@ -19,10 +19,29 @@ from demo.registry import MODELS, DEFAULT_MODEL, get_backend
 from demo.viz import COLOR_MAP, stats_html, status_html
 
 EXAMPLES = [
-    "Lily can run 12 kilometers per hour for 4 hours. After that, she runs 6 "
-    "kilometers per hour. How many kilometers can she run in 8 hours?",
-    "Write a Python function that returns the n-th Fibonacci number.",
-    "Explain why the sky is blue in two sentences.",
+    # multi-step grade-school math (GSM8K-style)
+    "A bakery sells cupcakes in boxes of 6 and cookies in boxes of 8. On Monday "
+    "they sold 14 boxes of cupcakes and 9 boxes of cookies. On Tuesday they sold "
+    "twice as many cupcakes and half as many cookies as Monday. How many "
+    "individual cupcakes and cookies did they sell in total over the two days? "
+    "Show your reasoning step by step.",
+    # algebra / word problem requiring setup
+    "Two trains leave the same station traveling in opposite directions. One "
+    "travels at 60 km/h and the other at 90 km/h. After how many hours will they "
+    "be 450 km apart, and how far has each train traveled? Explain each step.",
+    # code generation (HumanEval/MBPP-style, non-trivial)
+    "Write a Python function `merge_intervals(intervals)` that takes a list of "
+    "`[start, end]` intervals, merges all overlapping intervals, and returns the "
+    "merged list sorted by start. Include a short docstring and handle the empty "
+    "list case.",
+    # dynamic-programming coding task
+    "Implement a Python function `longest_common_subsequence(a, b)` that returns "
+    "the length of the longest common subsequence of two strings using dynamic "
+    "programming. Add comments explaining the DP table.",
+    # structured reasoning / explanation
+    "Explain the difference between BFS and DFS for graph traversal: give the data "
+    "structure each uses, their time complexity, and one problem where each is the "
+    "better choice.",
 ]
 
 # --------------------------------------------------------------------------------------
@@ -262,7 +281,7 @@ def build_demo():
 
         with gr.Accordion("Generation Settings", open=False):
             with gr.Row():
-                gen_length = gr.Slider(32, 256, value=128, step=32, label="gen_length")
+                gen_length = gr.Slider(32, 512, value=256, step=32, label="gen_length")
                 block_length = gr.Slider(16, 64, value=32, step=16, label="block_length")
             with gr.Row():
                 threshold = gr.Slider(0.5, 1.0, value=0.9, step=0.01,
