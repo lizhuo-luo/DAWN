@@ -1,6 +1,10 @@
 --index-url https://pypi.org/simple
 --extra-index-url https://download.pytorch.org/whl/cu121
 
+# Fully reproducible pins for eval + the DAWN speed-race demo (app.py).
+# The demo deps from requirements-demo.txt are already included below and
+# tagged with "# demo": gradio, gradio_client, matplotlib, seaborn.
+
 absl-py==2.3.1
 accelerate==0.34.2
 aiofiles==24.1.0
@@ -42,8 +46,8 @@ filelock==3.19.1
 fonttools==4.60.1
 frozenlist==1.8.0
 fsspec==2025.9.0
-gradio==5.50.0
-gradio_client==1.14.0
+gradio==5.50.0          # demo
+gradio_client==1.14.0   # demo
 groovy==0.1.2
 h11==0.16.0
 hf-xet==1.2.0
@@ -69,7 +73,7 @@ lxml==6.0.2
 markdown-it-py==4.0.0
 MarkupSafe==2.1.5
 math-verify==0.8.0
-matplotlib==3.10.7
+matplotlib==3.10.7      # demo
 matplotlib-inline==0.2.1
 mbstrdecoder==1.1.4
 mdurl==0.1.2
@@ -140,7 +144,7 @@ safehttpx==0.1.7
 safetensors==0.6.2
 scikit-learn==1.7.2
 scipy==1.15.3
-seaborn==0.13.2
+seaborn==0.13.2         # demo
 semantic-version==2.10.0
 sentencepiece==0.2.1
 shellingham==1.5.4

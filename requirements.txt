@@ -11,3 +11,9 @@ numpy==2.1.2
 packaging==26.0
 regex==2025.11.3
 tqdm==4.67.1
+
+# --- DAWN speed-race demo (app.py) ---
+# Only needed to run the Gradio web demo, not for eval. See requirements-demo.txt.
+gradio>=4.0
+matplotlib  # transitively required by llada/gdllm_utils.py (via llada/generate.py)
+seaborn     # transitively required by llada/gdllm_utils.py (via llada/generate.py)
