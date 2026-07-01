@@ -29,19 +29,19 @@ EXAMPLES = [
     "Two trains leave the same station traveling in opposite directions. One "
     "travels at 60 km/h and the other at 90 km/h. After how many hours will they "
     "be 450 km apart, and how far has each train traveled? Explain each step.",
-    # code generation (HumanEval/MBPP-style, non-trivial)
-    "Write a Python function `merge_intervals(intervals)` that takes a list of "
-    "`[start, end]` intervals, merges all overlapping intervals, and returns the "
-    "merged list sorted by start. Include a short docstring and handle the empty "
-    "list case.",
-    # dynamic-programming coding task
-    "Implement a Python function `longest_common_subsequence(a, b)` that returns "
-    "the length of the longest common subsequence of two strings using dynamic "
-    "programming. Add comments explaining the DP table.",
-    # structured reasoning / explanation
-    "Explain the difference between BFS and DFS for graph traversal: give the data "
-    "structure each uses, their time complexity, and one problem where each is the "
-    "better choice.",
+    # # code generation (HumanEval/MBPP-style, non-trivial)
+    # "Write a Python function `merge_intervals(intervals)` that takes a list of "
+    # "`[start, end]` intervals, merges all overlapping intervals, and returns the "
+    # "merged list sorted by start. Include a short docstring and handle the empty "
+    # "list case.",
+    # # dynamic-programming coding task
+    # "Implement a Python function `longest_common_subsequence(a, b)` that returns "
+    # "the length of the longest common subsequence of two strings using dynamic "
+    # "programming. Add comments explaining the DP table.",
+    # # structured reasoning / explanation
+    # "Explain the difference between BFS and DFS for graph traversal: give the data "
+    # "structure each uses, their time complexity, and one problem where each is the "
+    # "better choice.",
 ]
 
 # --------------------------------------------------------------------------------------
