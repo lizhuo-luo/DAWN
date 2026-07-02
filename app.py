@@ -47,135 +47,88 @@ EXAMPLES = [
 # --------------------------------------------------------------------------------------
 # Styling
 # --------------------------------------------------------------------------------------
-THEME = gr.themes.Soft(
-    primary_hue="indigo",
-    secondary_hue="violet",
-    neutral_hue="slate",
-    font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"],
+THEME = gr.themes.Default(
+    primary_hue="blue",
+    neutral_hue="gray",
+    font=["-apple-system", "BlinkMacSystemFont", "Segoe UI", "Helvetica", "Arial",
+          "sans-serif"],
+    font_mono=["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
+).set(
+    button_primary_background_fill="#2b6cb0",
+    button_primary_background_fill_hover="#245a94",
+    button_primary_text_color="#ffffff",
 )
 
 CSS = """
 .gradio-container {max-width: 1200px !important; margin: 0 auto;}
 
+/* flat, quiet visual language: thin borders, small radii, one steel-blue accent */
+
 /* ---------- header ---------- */
 .dawn-header {
-  position: relative; overflow: hidden;
-  border-radius: 22px; padding: 30px 34px; margin-bottom: 10px;
-  background: linear-gradient(120deg, #4f46e5 0%, #7c3aed 52%, #db2777 100%);
-  color: #fff; box-shadow: 0 18px 40px -12px rgba(79,70,229,.55);
-}
-.dawn-header__glow {
-  position: absolute; inset: -40% -10% auto auto; width: 360px; height: 360px;
-  background: radial-gradient(circle, rgba(255,255,255,.30), rgba(255,255,255,0) 65%);
-  pointer-events: none;
+  border: 1px solid var(--border-color-primary); border-radius: 8px;
+  padding: 14px 18px; margin-bottom: 4px;
+  background: var(--block-background-fill);
 }
 .dawn-header__title {
-  position: relative; font-size: 32px; font-weight: 900; letter-spacing:-.02em; margin:0;
-  text-shadow: 0 2px 12px rgba(0,0,0,.18);
+  font-size: 17px; font-weight: 700; margin: 0; color: var(--body-text-color);
 }
 .dawn-header__sub {
-  position: relative; font-size: 14.5px; opacity: .94; margin-top: 8px; max-width: 780px;
-  line-height: 1.55;
-}
-.dawn-chips {position: relative; display:flex; flex-wrap:wrap; gap:8px; margin-top:16px;}
-.dawn-chip {
-  font-size: 12.5px; font-weight: 600; color:#fff;
-  background: rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.30);
-  padding: 5px 12px; border-radius: 999px; backdrop-filter: blur(4px);
+  font-size: 13px; color: var(--body-text-color-subdued); margin-top: 4px;
+  line-height: 1.5;
 }
 
 /* ---------- status banner ---------- */
-/* translucent fills + colored left rail: reads correctly in light AND dark mode */
 .dawn-status {
-  border-radius: 12px; padding: 11px 16px; font-weight: 600; font-size: 14px;
-  border: 1px solid rgba(128,128,128,.22); border-left-width: 4px;
-  display:flex; align-items:center; gap:8px;
+  border: 1px solid var(--border-color-primary); border-radius: 8px;
+  padding: 8px 14px; font-size: 13px; font-weight: 500;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--body-text-color-subdued); background: var(--block-background-fill);
+  display: flex; align-items: center; gap: 8px;
 }
-.dawn-status--info {background: rgba(99,102,241,.12);  border-left-color:#6366f1; color: var(--body-text-color);}
-.dawn-status--run  {background: rgba(234,88,12,.12);   border-left-color:#ea580c; color: var(--body-text-color);}
-.dawn-status--done {background: rgba(16,185,129,.13);  border-left-color:#10b981; color: var(--body-text-color);}
-.dawn-status--run::before {
-  content:""; width:9px; height:9px; border-radius:999px; background:#ea580c;
-  box-shadow:0 0 0 0 rgba(234,88,12,.5); animation: dawn-pulse 1.2s infinite;
-}
-@keyframes dawn-pulse {
-  0%   {box-shadow:0 0 0 0 rgba(234,88,12,.5);}
-  70%  {box-shadow:0 0 0 8px rgba(234,88,12,0);}
-  100% {box-shadow:0 0 0 0 rgba(234,88,12,0);}
-}
+.dawn-status::before {content:""; width:8px; height:8px; border-radius:999px;}
+.dawn-status--info::before {background:#8b949e;}
+.dawn-status--run::before  {background:#d29922;}
+.dawn-status--done::before {background:#2da44e;}
 
 /* ---------- racing lanes ---------- */
 .dawn-lane {
-  position: relative; overflow: hidden;
-  border-radius: 16px; padding: 16px !important; background: var(--block-background-fill);
+  border-radius: 8px; padding: 12px !important;
+  background: var(--block-background-fill);
   border: 1px solid var(--border-color-primary);
-  transition: box-shadow .2s ease, transform .2s ease;
 }
-.dawn-lane::before {  /* top accent rail */
-  content:""; position:absolute; top:0; left:0; right:0; height:4px;
-}
-.dawn-lane--opp::before  {background: linear-gradient(90deg,#64748b,#94a3b8);}
-.dawn-lane--dawn::before {background: linear-gradient(90deg,#7c3aed,#db2777);}
-.dawn-lane--dawn {
-  border: 1.5px solid rgba(124,58,237,.55);
-  box-shadow: 0 10px 30px -8px rgba(124,58,237,.30);
-  background: linear-gradient(180deg, rgba(124,58,237,.06), rgba(124,58,237,0) 140px);
-}
+.dawn-lane--dawn {border: 2px solid #2b6cb0;}
 
 /* ---------- stat card ---------- */
-.dawn-stat {padding: 6px 2px 8px;}
+.dawn-stat {padding: 2px 2px 6px;}
 .dawn-stat__head {display:flex; align-items:center; gap:8px;}
-.dawn-stat__title {font-size: 18px; font-weight: 800; color: var(--body-text-color);}
-.dawn-stat--dawn .dawn-stat__title {
-  background: linear-gradient(90deg,#7c3aed,#db2777);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-.dawn-stat__chk {
-  color:#fff; background:#22c55e; border-radius:999px; width:20px; height:20px;
-  display:inline-flex; align-items:center; justify-content:center; font-size:12px;
-  box-shadow: 0 2px 8px rgba(34,197,94,.45);
-}
+.dawn-stat__head::before {content:""; width:9px; height:9px; border-radius:999px;}
+.dawn-stat--opp  .dawn-stat__head::before {background:#8b949e;}
+.dawn-stat--dawn .dawn-stat__head::before {background:#2b6cb0;}
+.dawn-stat__title {font-size: 15px; font-weight: 700; color: var(--body-text-color);}
+.dawn-stat__chk {color:#2da44e; font-weight:700; font-size:13px;}
 .dawn-stat__method {
   display:inline-block; font-family: ui-monospace, monospace; font-size: 12px;
-  color:#9ca3af; background: rgba(128,128,128,.16); padding: 2px 8px; border-radius: 6px;
-  margin: 6px 0 12px;
+  color: var(--body-text-color-subdued); margin: 4px 0 10px;
 }
-.dawn-stat__tiles {display:flex; gap:10px;}
-/* mode-agnostic translucent tiles: a subtle gray overlay reads correctly on
-   both light and dark themes, and body-text-color always contrasts the page. */
+.dawn-stat__tiles {display:flex; gap:8px;}
 .dawn-tile {
-  flex:1; text-align:center; padding: 12px 6px; border-radius: 12px;
-  background: rgba(128,128,128,.14); border:1px solid rgba(128,128,128,.24);
-  transition: transform .15s ease;
+  flex:1; text-align:left; padding: 8px 12px; border-radius: 6px;
+  background: #f6f8fa; border:1px solid var(--border-color-primary);
 }
-.dawn-tile:hover {transform: translateY(-2px);}
-.dawn-stat--dawn .dawn-tile {background: rgba(124,58,237,.12); border-color: rgba(124,58,237,.30);}
+.dawn-tile__l {
+  font-size: 11px; font-family: ui-monospace, monospace;
+  color: var(--body-text-color-subdued); margin-bottom: 4px;
+}
 .dawn-tile__v {
-  font-size: 23px; font-weight: 800; line-height: 1; color: var(--body-text-color);
+  font-size: 16px; font-weight: 600; line-height: 1.1; color: var(--body-text-color);
   font-variant-numeric: tabular-nums; font-feature-settings: "tnum";
 }
-.dawn-tile__v span {font-size: 13px; font-weight:600; opacity:.6; margin-left:1px;}
-.dawn-tile__l {font-size: 11px; text-transform: uppercase; letter-spacing:.06em;
-  color:#9ca3af; margin-top: 6px;}
+.dawn-tile__v span {font-size: 12px; font-weight:500; opacity:.6; margin-left:1px;}
 .dawn-speedup {
-  margin-top: 14px; text-align:center; font-weight: 800; font-size: 18px; color:#fff;
-  padding: 11px; border-radius: 12px;
-  background: linear-gradient(100deg,#7c3aed,#db2777);
-  box-shadow: 0 8px 22px -4px rgba(219,39,119,.5);
-  animation: dawn-pop .4s ease;
-}
-@keyframes dawn-pop {0% {transform: scale(.94); opacity:.4;} 100% {transform: scale(1); opacity:1;}}
-
-/* ---------- primary button ---------- */
-button.primary, .dawn-race-btn {
-  background: linear-gradient(100deg,#6d28d9,#db2777) !important; border:none !important;
-  color:#fff !important; font-weight:700 !important;
-  box-shadow: 0 8px 20px -6px rgba(124,58,237,.55) !important;
-  transition: transform .12s ease, box-shadow .2s ease !important;
-}
-button.primary:hover, .dawn-race-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 26px -6px rgba(219,39,119,.6) !important;
+  margin-top: 10px; font-weight: 600; font-size: 13.5px; color: #2b6cb0;
+  padding: 7px 12px; border-radius: 6px;
+  border: 1px solid #2b6cb0; background: rgba(43,108,176,.06);
 }
 """
 
@@ -246,7 +199,7 @@ def run_race(
 
     # ---- load model (may swap the resident one) -------------------------------
     yield emit(empty, empty, idle_l, idle_r,
-               status_html(f"⏳ Loading <b>{model_key}</b> …", "run"))
+               status_html(f"Loading <b>{model_key}</b> …", "run"))
     backend = get_backend(model_key)
 
     # ---- opponent (streamed live) ---------------------------------------------
@@ -254,14 +207,14 @@ def run_race(
     opp_nfe, opp_e2e, opp_eff = 0, 0.0, 0
     opp_stat = idle_l
     yield emit(empty, empty, idle_l, idle_r,
-               status_html(f"▶️ Racing <b>{opp_name}</b> …", "run"))
+               status_html(f"Racing <b>{opp_name}</b> …", "run"))
     for upd in backend.run_stream(message, [], {**common, "method": opponent}):
         of.append(upd["state"])
         opp_nfe, opp_e2e, opp_eff = upd["nfe"], upd["e2e"], upd["eff"]
         opp_stat = stats_html("Opponent", opp_name, opp_nfe, opp_e2e, opp_eff,
                               finished=upd["done"], accent="opp")
         yield emit(upd["state"], empty, opp_stat, idle_r,
-                   status_html(f"▶️ Opponent (<b>{opp_name}</b>) denoising …", "run"))
+                   status_html(f"Opponent (<b>{opp_name}</b>) denoising …", "run"))
         if viz_delay > 0:
             time.sleep(viz_delay)
 
@@ -277,7 +230,7 @@ def run_race(
         dawn_stat = stats_html("DAWN", "dependency-aware", dawn_nfe, dawn_e2e,
                                dawn_eff, speedup=sp, finished=upd["done"], accent="dawn")
         yield emit(opp_final, upd["state"], opp_stat, dawn_stat,
-                   status_html("▶️ DAWN denoising …", "run"))
+                   status_html("DAWN denoising …", "run"))
         if viz_delay > 0:
             time.sleep(viz_delay)
 
@@ -289,8 +242,8 @@ def run_race(
 
     # ---- settle on final state -------------------------------------------------
     winner = "DAWN" if (speedup and speedup >= 1) else "Opponent"
-    msg = f"✅ Done — <b>{winner}</b> wins" + (
-        f" &nbsp;·&nbsp; {speedup:.2f}× faster" if speedup else ""
+    msg = f"Done — <b>{winner}</b> wins" + (
+        f" · {speedup:.2f}× faster" if speedup else ""
     )
     yield emit(of[-1] if of else empty, df[-1] if df else empty,
                opp_stat, dawn_stat, status_html(msg, "done"))
@@ -304,22 +257,29 @@ def clear_all():
 # --------------------------------------------------------------------------------------
 # UI
 # --------------------------------------------------------------------------------------
+# Force the light theme regardless of the browser/OS dark-mode preference: Gradio
+# only honors the __theme URL param, so redirect once if it isn't set to light.
+FORCE_LIGHT_JS = """
+function refresh() {
+    const url = new URL(window.location);
+    if (url.searchParams.get('__theme') !== 'light') {
+        url.searchParams.set('__theme', 'light');
+        window.location.href = url.href;
+    }
+}
+"""
+
+
 def build_demo():
-    with gr.Blocks(title="DAWN Speed Race", theme=THEME, css=CSS) as demo:
+    with gr.Blocks(title="DAWN Speed Race", theme=THEME, css=CSS,
+                   js=FORCE_LIGHT_JS) as demo:
         gr.HTML(
             '<div class="dawn-header">'
-            '  <div class="dawn-header__glow"></div>'
-            '  <div class="dawn-header__title">🏁 DAWN Speed Race</div>'
-            '  <div class="dawn-header__sub">Dependency-Aware Fast Inference for '
-            'Diffusion LLMs — watch DAWN out-pace the baseline on the same GPU. '
-            'Pick a model; on a single GPU the two methods run sequentially and '
-            'each lane reports its own end-to-end time.</div>'
-            '  <div class="dawn-chips">'
-            '    <span class="dawn-chip">⚡ Training-free</span>'
-            '    <span class="dawn-chip">🔌 Plug-and-play</span>'
-            '    <span class="dawn-chip">🧩 Dependency-aware</span>'
-            '    <span class="dawn-chip">🚀 Parallel decoding</span>'
-            '  </div>'
+            '<div class="dawn-header__title">DAWN Speed Race</div>'
+            '<div class="dawn-header__sub">Dependency-Aware Fast Inference for '
+            'Diffusion LLMs — DAWN vs. baseline on the same GPU. The two methods '
+            'run sequentially (single GPU); each lane reports its own '
+            'end-to-end time, steps and tok/s.</div>'
             '</div>'
         )
 
@@ -336,7 +296,7 @@ def build_demo():
         with gr.Row():
             msg = gr.Textbox(label="Prompt", placeholder="Ask something…",
                              scale=5, autofocus=True)
-            send_btn = gr.Button("🏁 Race", variant="primary", scale=1,
+            send_btn = gr.Button("Race", variant="primary", scale=1,
                                   elem_classes="dawn-race-btn")
             clear_btn = gr.Button("Clear", scale=1)
 

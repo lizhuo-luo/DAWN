@@ -12,8 +12,8 @@ LABEL_MASK = "masked"
 LABEL_COMMITTED = "committed"
 
 COLOR_MAP = {
-    LABEL_MASK: "#2a2f3a",       # dark slate
-    LABEL_COMMITTED: "#6366f1",  # indigo (matches accent)
+    LABEL_MASK: "#57606a",       # muted gray
+    LABEL_COMMITTED: "#2b6cb0",  # steel blue (matches accent)
 }
 
 
@@ -79,9 +79,9 @@ def stats_html(title, method_name, nfe, elapsed, n_tokens,
     is computed from it.
     """
     toks_per_s = (n_tokens / elapsed) if elapsed > 0 else 0.0
-    chk = '<span class="dawn-stat__chk">✓</span>' if finished else ""
+    chk = '<span class="dawn-stat__chk">✓ done</span>' if finished else ""
     speed = (
-        f'<div class="dawn-speedup">🏁 {speedup:.2f}× faster</div>'
+        f'<div class="dawn-speedup">{speedup:.2f}× faster</div>'
         if speedup is not None else ""
     )
     return (
@@ -91,9 +91,8 @@ def stats_html(title, method_name, nfe, elapsed, n_tokens,
         f'  </div>'
         f'  <div class="dawn-stat__method">{method_name}</div>'
         f'  <div class="dawn-stat__tiles">'
-        f'    <div class="dawn-tile"><div class="dawn-tile__v">{elapsed:.2f}<span>s</span></div><div class="dawn-tile__l">e2e</div></div>'
-        f'    <div class="dawn-tile"><div class="dawn-tile__v">{nfe}</div><div class="dawn-tile__l">steps</div></div>'
-        f'    <div class="dawn-tile"><div class="dawn-tile__v">{toks_per_s:.0f}</div><div class="dawn-tile__l">tok/s</div></div>'
+        f'    <div class="dawn-tile"><div class="dawn-tile__l">Tokens</div><div class="dawn-tile__v">{n_tokens}</div></div>'
+        f'    <div class="dawn-tile"><div class="dawn-tile__l">TPS</div><div class="dawn-tile__v">{toks_per_s:.1f}</div></div>'
         f'  </div>'
         f'  {speed}'
         f'</div>'
