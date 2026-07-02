@@ -23,6 +23,15 @@ LLADA_DIR = os.path.join(REPO_ROOT, "llada")
 DREAM_DIR = os.path.join(REPO_ROOT, "dream")
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+if DEVICE == "cpu":
+    print(
+        "[demo] WARNING: torch.cuda.is_available() is False — running on CPU, "
+        "which is extremely slow for 7-8B models. Check that the container was "
+        "started with GPU access (docker run --gpus all), that the installed "
+        "torch is a CUDA build (torch.version.cuda is not None), and that "
+        "CUDA_VISIBLE_DEVICES is not empty.",
+        file=sys.stderr,
+    )
 
 # display name -> (family, hf model path)
 MODELS = {
@@ -77,6 +86,11 @@ def get_backend(model_key):
                 torch.cuda.empty_cache()
 
     family, path = MODELS[model_key]
+    dev_name = (
+        f"cuda:{torch.cuda.current_device()} ({torch.cuda.get_device_name()})"
+        if DEVICE == "cuda" else "cpu"
+    )
+    print(f"[demo] loading {path} on {dev_name}", flush=True)
     if family == "llada":
         _activate_dir(LLADA_DIR)
         from demo.backend_llada import LladaBackend

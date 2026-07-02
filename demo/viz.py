@@ -80,21 +80,20 @@ def stats_html(title, method_name, nfe, elapsed, n_tokens,
     """
     toks_per_s = (n_tokens / elapsed) if elapsed > 0 else 0.0
     chk = '<span class="dawn-stat__chk">✓ done</span>' if finished else ""
-    speed = (
-        f'<div class="dawn-speedup">{speedup:.2f}× faster</div>'
-        if speedup is not None else ""
-    )
+    speed = ""
+    if speedup is not None:
+        val = f"{speedup:.2f}".rstrip("0").rstrip(".")  # 1.00 -> "1"
+        speed = f'<span class="dawn-stat__speed">{val}×</span>'
     return (
         f'<div class="dawn-stat dawn-stat--{accent}">'
         f'  <div class="dawn-stat__head">'
-        f'    <span class="dawn-stat__title">{title}</span>{chk}'
+        f'    <span class="dawn-stat__title">{title}</span>{speed}{chk}'
         f'  </div>'
         f'  <div class="dawn-stat__method">{method_name}</div>'
         f'  <div class="dawn-stat__tiles">'
         f'    <div class="dawn-tile"><div class="dawn-tile__l">Tokens</div><div class="dawn-tile__v">{n_tokens}</div></div>'
         f'    <div class="dawn-tile"><div class="dawn-tile__l">TPS</div><div class="dawn-tile__v">{toks_per_s:.1f}</div></div>'
         f'  </div>'
-        f'  {speed}'
         f'</div>'
     )
 

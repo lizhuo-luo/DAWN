@@ -1,17 +1,16 @@
 # DAWN Speed Race — model-agnostic side-by-side demo
 #
-# Races DAWN (dependency-aware parallel decoding) against a baseline opponent on
-# a diffusion LLM. A model selector switches between LLaDA and Dream; only one
-# model is resident at a time (single-GPU friendly), generation is sequential,
-# and each panel reports its own end-to-end (e2e) wall-clock time, step count
-# (NFE) and tokens/sec. DAWN's panel also shows the speedup factor. Each lane is
-# animated once, live, as it generates (opponent first, then DAWN).
+# Races three decoding methods on a diffusion LLM, shown side by side: vanilla
+# (1 token/step), parallel confidence-threshold, and DAWN (dependency-aware
+# parallel decoding). A model selector switches between LLaDA and Dream; only one
+# model is resident at a time (single-GPU friendly). The lanes generate
+# sequentially (vanilla -> parallel -> dawn), each animated live at its real
+# per-step pace; each panel reports its effective tokens and TPS, and the
+# parallel/DAWN panels show the throughput speedup vs the vanilla baseline.
 #
 # Run:   python app.py        (from the repo root)
 # Needs: a CUDA GPU (~16GB+ for the 7-8B models in bf16) and the demo deps
 #        (see requirements-demo.txt).
-
-import time
 
 import gradio as gr
 
@@ -81,7 +80,7 @@ CSS = """
 /* ---------- status banner ---------- */
 .dawn-status {
   border: 1px solid var(--border-color-primary); border-radius: 8px;
-  padding: 8px 14px; font-size: 13px; font-weight: 500;
+  padding: 10px 14px; font-size: 13px; font-weight: 500;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--body-text-color-subdued); background: var(--block-background-fill);
   display: flex; align-items: center; gap: 8px;
@@ -91,20 +90,35 @@ CSS = """
 .dawn-status--run::before  {background:#d29922;}
 .dawn-status--done::before {background:#2da44e;}
 
+/* action row: keep the buttons a fixed size — without this they stretch to
+   match the status column's height when it shows its loading state */
+.dawn-action-row {align-items: flex-start;}
+.dawn-action-row button {height: 40px; flex: none;}
+.dawn-status {min-height: 40px; box-sizing: border-box;}
+
+/* Gradio 4.44 bug workaround: the per-component status tracker
+   (<div class="wrap ...">) lacks position:absolute in this release, so it sits
+   in normal flow and reserves a tall blank strip above every output while an
+   event runs — even with show_progress="hidden" it is merely opacity:0 and
+   still occupies space. We render our own status banner, so remove hidden
+   trackers from the layout entirely. */
+.gradio-container .wrap.hide {display: none !important;}
+
 /* ---------- racing lanes ---------- */
 .dawn-lane {
   border-radius: 8px; padding: 12px !important;
   background: var(--block-background-fill);
   border: 1px solid var(--border-color-primary);
 }
-.dawn-lane--dawn {border: 2px solid #2b6cb0;}
+.dawn-lane--dawn {border: 2px solid #2da44e;}
 
 /* ---------- stat card ---------- */
 .dawn-stat {padding: 2px 2px 6px;}
 .dawn-stat__head {display:flex; align-items:center; gap:8px;}
 .dawn-stat__head::before {content:""; width:9px; height:9px; border-radius:999px;}
 .dawn-stat--opp  .dawn-stat__head::before {background:#8b949e;}
-.dawn-stat--dawn .dawn-stat__head::before {background:#2b6cb0;}
+.dawn-stat--par  .dawn-stat__head::before {background:#2b6cb0;}
+.dawn-stat--dawn .dawn-stat__head::before {background:#2da44e;}
 .dawn-stat__title {font-size: 15px; font-weight: 700; color: var(--body-text-color);}
 .dawn-stat__chk {color:#2da44e; font-weight:700; font-size:13px;}
 .dawn-stat__method {
@@ -125,10 +139,17 @@ CSS = """
   font-variant-numeric: tabular-nums; font-feature-settings: "tnum";
 }
 .dawn-tile__v span {font-size: 12px; font-weight:500; opacity:.6; margin-left:1px;}
-.dawn-speedup {
-  margin-top: 10px; font-weight: 600; font-size: 13.5px; color: #2b6cb0;
-  padding: 7px 12px; border-radius: 6px;
-  border: 1px solid #2b6cb0; background: rgba(43,108,176,.06);
+.dawn-stat__speed {
+  font-weight: 600; font-size: 12.5px; line-height: 1;
+  padding: 3px 8px; border-radius: 999px;
+  color: #57606a; border: 1px solid #8b949e; background: rgba(139,148,158,.08);
+  font-variant-numeric: tabular-nums;
+}
+.dawn-stat--par .dawn-stat__speed {
+  color: #2b6cb0; border-color: #2b6cb0; background: rgba(43,108,176,.06);
+}
+.dawn-stat--dawn .dawn-stat__speed {
+  color: #2da44e; border-color: #2da44e; background: rgba(45,164,78,.06);
 }
 """
 
@@ -136,8 +157,13 @@ CSS = """
 # --------------------------------------------------------------------------------------
 # Race driver
 # --------------------------------------------------------------------------------------
-def opponent_label(opponent):
-    return "Vanilla (1 token/step)" if opponent == "vanilla" else "Parallel-threshold"
+# The three lanes, raced sequentially (single GPU) and shown side by side:
+# (method key, panel title, method subtitle, stat-card accent)
+LANES = [
+    ("vanilla", "Vanilla", "1 token/step", "opp"),
+    ("parallel", "Parallel", "confidence-threshold", "par"),
+    ("dawn", "DAWN", "dependency-aware", "dawn"),
+]
 
 
 # DAWN hyper-parameters exactly as used in the eval scripts. LLaDA's dawn path
@@ -156,23 +182,23 @@ def _apply_preset(model_key):
     return p["tau_sink"], p["tau_edge"], p["tau_induce"], p["tau_low"], p["conf_threshold"]
 
 
-def _idle_stats(opp_name):
-    return (
-        stats_html("Opponent", opp_name, 0, 0.0, 0, accent="opp"),
-        stats_html("DAWN", "dependency-aware", 0, 0.0, 0, accent="dawn"),
-    )
+def _idle_stats():
+    return [
+        stats_html(title, sub, 0, 0.0, 0, accent=accent)
+        for _, title, sub, accent in LANES
+    ]
 
 
-def _speedup(opp_eff, opp_e2e, dawn_eff, dawn_e2e):
-    """Speedup defined by throughput: DAWN tok/s divided by opponent tok/s."""
-    opp_tps = (opp_eff / opp_e2e) if opp_e2e > 0 else 0.0
-    dawn_tps = (dawn_eff / dawn_e2e) if dawn_e2e > 0 else 0.0
-    return (dawn_tps / opp_tps) if opp_tps > 0 else None
+def _speedup(base_eff, base_e2e, eff, e2e):
+    """Throughput speedup vs the vanilla baseline: tok/s divided by tok/s."""
+    base_tps = (base_eff / base_e2e) if base_e2e > 0 else 0.0
+    tps = (eff / e2e) if e2e > 0 else 0.0
+    return (tps / base_tps) if base_tps > 0 else None
 
 
 def run_race(
-    message, model_key, opponent, gen_length, block_length, threshold,
-    temperature, top_p, viz_delay, tau_sink, tau_edge, tau_induce, tau_low,
+    message, model_key, gen_length, block_length, threshold,
+    temperature, top_p, tau_sink, tau_edge, tau_induce, tau_low,
     conf_threshold,
 ):
     if not message or not message.strip():
@@ -183,75 +209,62 @@ def run_race(
         )
 
     gen_length = int(gen_length)
-    opp_name = opponent_label(opponent)
 
     common = dict(
         gen_length=gen_length, block_length=int(block_length), threshold=threshold,
         temperature=temperature, top_p=top_p, tau_sink=tau_sink, tau_edge=tau_edge,
         tau_induce=tau_induce, tau_low=tau_low, conf_threshold=conf_threshold,
     )
-    empty = []
 
-    def emit(left, right, lstat, rstat, status):
-        return left, right, lstat, rstat, status
+    states = [[] for _ in LANES]
+    stats = _idle_stats()
 
-    idle_l, idle_r = _idle_stats(opp_name)
+    def emit(status):
+        return (*states, *stats, status)
 
     # ---- load model (may swap the resident one) -------------------------------
-    yield emit(empty, empty, idle_l, idle_r,
-               status_html(f"Loading <b>{model_key}</b> …", "run"))
+    yield emit(status_html(f"Loading <b>{model_key}</b> …", "run"))
     backend = get_backend(model_key)
+    if backend.device == "cpu":
+        gr.Warning(
+            "CUDA is not available — running on CPU, which is extremely slow. "
+            "Check that this container has GPU access and a CUDA build of torch."
+        )
 
-    # ---- opponent (streamed live) ---------------------------------------------
-    of = []
-    opp_nfe, opp_e2e, opp_eff = 0, 0.0, 0
-    opp_stat = idle_l
-    yield emit(empty, empty, idle_l, idle_r,
-               status_html(f"Racing <b>{opp_name}</b> …", "run"))
-    for upd in backend.run_stream(message, [], {**common, "method": opponent}):
-        of.append(upd["state"])
-        opp_nfe, opp_e2e, opp_eff = upd["nfe"], upd["e2e"], upd["eff"]
-        opp_stat = stats_html("Opponent", opp_name, opp_nfe, opp_e2e, opp_eff,
-                              finished=upd["done"], accent="opp")
-        yield emit(upd["state"], empty, opp_stat, idle_r,
-                   status_html(f"Opponent (<b>{opp_name}</b>) denoising …", "run"))
-        if viz_delay > 0:
-            time.sleep(viz_delay)
+    # ---- race the three lanes sequentially (single GPU), each streamed live ---
+    base_eff, base_e2e = 0, 0.0  # vanilla baseline for the speedup ratios
+    results = {}
+    for idx, (method, title, sub, accent) in enumerate(LANES):
+        nfe, e2e, eff = 0, 0.0, 0
+        yield emit(status_html(f"<b>{title}</b> denoising …", "run"))
+        for upd in backend.run_stream(message, [], {**common, "method": method}):
+            nfe, e2e, eff = upd["nfe"], upd["e2e"], upd["eff"]
+            sp = _speedup(base_eff, base_e2e, eff, e2e) if idx > 0 else 1.0
+            states[idx] = upd["state"]
+            stats[idx] = stats_html(title, sub, nfe, e2e, eff, speedup=sp,
+                                    finished=upd["done"], accent=accent)
+            yield emit(status_html(f"<b>{title}</b> denoising …", "run"))
+        if method == "vanilla":
+            base_eff, base_e2e = eff, e2e
+        results[method] = (eff, e2e)
 
-    # ---- DAWN (streamed live) -------------------------------------------------
-    df = []
-    dawn_nfe, dawn_e2e, dawn_eff = 0, 0.0, 0
-    dawn_stat = idle_r
-    opp_final = of[-1] if of else empty
-    for upd in backend.run_stream(message, [], {**common, "method": "dawn"}):
-        df.append(upd["state"])
-        dawn_nfe, dawn_e2e, dawn_eff = upd["nfe"], upd["e2e"], upd["eff"]
-        sp = _speedup(opp_eff, opp_e2e, dawn_eff, dawn_e2e)
-        dawn_stat = stats_html("DAWN", "dependency-aware", dawn_nfe, dawn_e2e,
-                               dawn_eff, speedup=sp, finished=upd["done"], accent="dawn")
-        yield emit(opp_final, upd["state"], opp_stat, dawn_stat,
-                   status_html("DAWN denoising …", "run"))
-        if viz_delay > 0:
-            time.sleep(viz_delay)
+    # ---- final status -----------------------------------------------------------
+    def tps(method):
+        eff, e2e = results[method]
+        return (eff / e2e) if e2e > 0 else 0.0
 
-    speedup = _speedup(opp_eff, opp_e2e, dawn_eff, dawn_e2e)
-    opp_stat = stats_html("Opponent", opp_name, opp_nfe, opp_e2e, opp_eff,
-                          finished=True, accent="opp")
-    dawn_stat = stats_html("DAWN", "dependency-aware", dawn_nfe, dawn_e2e,
-                           dawn_eff, speedup=speedup, finished=True, accent="dawn")
-
-    # ---- settle on final state -------------------------------------------------
-    winner = "DAWN" if (speedup and speedup >= 1) else "Opponent"
-    msg = f"Done — <b>{winner}</b> wins" + (
-        f" · {speedup:.2f}× faster" if speedup else ""
+    winner = max(results, key=tps)
+    winner_title = {m: t for m, t, _, _ in LANES}[winner]
+    sp = _speedup(base_eff, base_e2e, *results[winner])
+    msg = f"Done — <b>{winner_title}</b> wins" + (
+        f" · {sp:.2f}× faster than vanilla" if sp and winner != "vanilla" else ""
     )
-    yield emit(of[-1] if of else empty, df[-1] if df else empty,
-               opp_stat, dawn_stat, status_html(msg, "done"))
+    yield emit(status_html(msg, "done"))
 
 
 def clear_all():
-    idle_l, idle_r = _idle_stats("—")
-    return [], [], idle_l, idle_r, "", status_html("Ready when you are.", "info")
+    return (*[[] for _ in LANES], *_idle_stats(), "",
+            status_html("Ready when you are.", "info"))
 
 
 # --------------------------------------------------------------------------------------
@@ -277,30 +290,21 @@ def build_demo():
             '<div class="dawn-header">'
             '<div class="dawn-header__title">DAWN Speed Race</div>'
             '<div class="dawn-header__sub">Dependency-Aware Fast Inference for '
-            'Diffusion LLMs — DAWN vs. baseline on the same GPU. The two methods '
-            'run sequentially (single GPU); each lane reports its own '
-            'end-to-end time, steps and tok/s.</div>'
+            'Diffusion LLMs — the three decoding methods run sequentially on the '
+            'same GPU and are shown side by side; each lane reports its own '
+            'effective tokens and TPS.</div>'
             '</div>'
         )
 
         with gr.Row():
             model_key = gr.Dropdown(
-                choices=list(MODELS.keys()), value=DEFAULT_MODEL, label="Model", scale=2
+                choices=list(MODELS.keys()), value=DEFAULT_MODEL, label="Model", scale=1
             )
-            opponent = gr.Dropdown(
-                choices=[("Vanilla (1 token/step)", "vanilla"),
-                         ("Parallel-threshold", "parallel")],
-                value="vanilla", label="Opponent", scale=2,
-            )
-
-        with gr.Row():
             msg = gr.Textbox(label="Prompt", placeholder="Ask something…",
-                             scale=5, autofocus=True)
-            send_btn = gr.Button("Race", variant="primary", scale=1,
-                                  elem_classes="dawn-race-btn")
-            clear_btn = gr.Button("Clear", scale=1)
+                             autofocus=True, scale=4)
 
-        gr.Examples(examples=EXAMPLES, inputs=msg)
+        with gr.Accordion("Examples", open=False):
+            gr.Examples(examples=EXAMPLES, inputs=msg)
 
         with gr.Accordion("Generation Settings", open=False):
             with gr.Row():
@@ -308,13 +312,10 @@ def build_demo():
                 block_length = gr.Slider(16, 64, value=32, step=16, label="block_length")
             with gr.Row():
                 threshold = gr.Slider(0.5, 1.0, value=0.9, step=0.01,
-                                      label="threshold (parallel opponent)")
+                                      label="threshold (Parallel lane)")
                 temperature = gr.Slider(0.0, 1.0, value=0.0, step=0.05, label="temperature")
                 top_p = gr.Slider(0.1, 1.0, value=0.95, step=0.05,
                                   label="top_p (Dream, temp>0)")
-            with gr.Row():
-                viz_delay = gr.Slider(0.0, 0.3, value=0.05, step=0.01,
-                                      label="animation delay (s/frame)")
             with gr.Accordion("DAWN advanced (tau / conf)", open=False):
                 with gr.Row():
                     tau_sink = gr.Slider(0.0, 0.2, value=0.01, step=0.005, label="tau_sink")
@@ -325,29 +326,32 @@ def build_demo():
                     conf_threshold = gr.Slider(0.0, 1.0, value=0.8, step=0.05,
                                                label="conf_threshold (Dream)")
 
-        status = gr.HTML(status_html("Ready when you are.", "info"))
+        # Race / Clear sit on the left of the status row
+        with gr.Row(elem_classes="dawn-action-row"):
+            send_btn = gr.Button("Race", variant="primary", scale=0,
+                                 min_width=110, elem_classes="dawn-race-btn")
+            clear_btn = gr.Button("Clear", scale=0, min_width=90)
+            with gr.Column(scale=10):
+                status = gr.HTML(status_html("Ready when you are.", "info"))
 
-        idle_l, idle_r = _idle_stats("—")
+        idle = _idle_stats()
+        vis_boxes, stat_boxes = [], []
         with gr.Row(equal_height=True):
-            with gr.Column(scale=10, elem_classes="dawn-lane dawn-lane--opp"):
-                left_stats = gr.HTML(idle_l)
-                left_vis = gr.HighlightedText(
-                    label="Opponent — denoising", combine_adjacent=False,
-                    show_legend=True, color_map=COLOR_MAP,
-                )
-            with gr.Column(scale=10, elem_classes="dawn-lane dawn-lane--dawn"):
-                right_stats = gr.HTML(idle_r)
-                right_vis = gr.HighlightedText(
-                    label="DAWN — denoising", combine_adjacent=False,
-                    show_legend=True, color_map=COLOR_MAP,
-                )
+            for (_method, title, _sub, accent), idle_stat in zip(LANES, idle):
+                with gr.Column(scale=10,
+                               elem_classes=f"dawn-lane dawn-lane--{accent}"):
+                    stat_boxes.append(gr.HTML(idle_stat))
+                    vis_boxes.append(gr.HighlightedText(
+                        label=f"{title} — denoising", combine_adjacent=False,
+                        show_legend=True, color_map=COLOR_MAP,
+                    ))
 
         inputs = [
-            msg, model_key, opponent, gen_length, block_length, threshold,
-            temperature, top_p, viz_delay, tau_sink, tau_edge, tau_induce, tau_low,
+            msg, model_key, gen_length, block_length, threshold,
+            temperature, top_p, tau_sink, tau_edge, tau_induce, tau_low,
             conf_threshold,
         ]
-        outputs = [left_vis, right_vis, left_stats, right_stats, status]
+        outputs = [*vis_boxes, *stat_boxes, status]
 
         # switching model resets DAWN's tau/conf to that model's eval preset
         model_key.change(
@@ -355,13 +359,17 @@ def build_demo():
             [tau_sink, tau_edge, tau_induce, tau_low, conf_threshold],
         )
 
-        send_btn.click(run_race, inputs=inputs, outputs=outputs).then(
-            lambda: "", None, msg
-        )
-        msg.submit(run_race, inputs=inputs, outputs=outputs).then(lambda: "", None, msg)
+        # show_progress="hidden": we render our own status/stats, and Gradio's
+        # built-in pending indicator inflates the output components' height
+        # (an extra blank strip appears while the model runs).
+        send_btn.click(run_race, inputs=inputs, outputs=outputs,
+                       show_progress="hidden").then(lambda: "", None, msg)
+        msg.submit(run_race, inputs=inputs, outputs=outputs,
+                   show_progress="hidden").then(lambda: "", None, msg)
         clear_btn.click(
             clear_all, None,
-            [left_vis, right_vis, left_stats, right_stats, msg, status],
+            [*vis_boxes, *stat_boxes, msg, status],
+            show_progress="hidden",
         )
 
     return demo
