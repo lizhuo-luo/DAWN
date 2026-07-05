@@ -28,19 +28,15 @@ EXAMPLES = [
     "Two trains leave the same station traveling in opposite directions. One "
     "travels at 60 km/h and the other at 90 km/h. After how many hours will they "
     "be 450 km apart, and how far has each train traveled? Explain each step.",
-    # # code generation (HumanEval/MBPP-style, non-trivial)
-    # "Write a Python function `merge_intervals(intervals)` that takes a list of "
-    # "`[start, end]` intervals, merges all overlapping intervals, and returns the "
-    # "merged list sorted by start. Include a short docstring and handle the empty "
-    # "list case.",
-    # # dynamic-programming coding task
-    # "Implement a Python function `longest_common_subsequence(a, b)` that returns "
-    # "the length of the longest common subsequence of two strings using dynamic "
-    # "programming. Add comments explaining the DP table.",
-    # # structured reasoning / explanation
-    # "Explain the difference between BFS and DFS for graph traversal: give the data "
-    # "structure each uses, their time complexity, and one problem where each is the "
-    # "better choice.",
+    # code generation (HumanEval/MBPP-style, non-trivial)
+    "Write a Python function `merge_intervals(intervals)` that takes a list of "
+    "`[start, end]` intervals, merges all overlapping intervals, and returns the "
+    "merged list sorted by start. Include a short docstring and handle the empty "
+    "list case.",
+    # structured reasoning / explanation
+    "Explain the difference between BFS and DFS for graph traversal: give the data "
+    "structure each uses, their time complexity, and one problem where each is the "
+    "better choice.",
 ]
 
 # --------------------------------------------------------------------------------------
@@ -106,8 +102,10 @@ CSS = """
 .gradio-container .prose.min {min-height: 0 !important;}
 
 /* ---------- racing lanes ---------- */
+/* slim separation between the three lanes — just enough to tell them apart */
+.dawn-lanes {gap: 4px !important;}
 .dawn-lane {
-  border-radius: 8px; padding: 12px !important;
+  border-radius: 8px; padding: 8px !important; gap: 6px !important;
   background: var(--block-background-fill);
   border: 1px solid var(--border-color-primary);
 }
@@ -337,9 +335,9 @@ def build_demo():
 
         idle = _idle_stats()
         vis_boxes, stat_boxes = [], []
-        with gr.Row(equal_height=True):
+        with gr.Row(equal_height=True, elem_classes="dawn-lanes"):
             for (_method, title, _sub, accent), idle_stat in zip(LANES, idle):
-                with gr.Column(scale=10,
+                with gr.Column(scale=10, min_width=220,
                                elem_classes=f"dawn-lane dawn-lane--{accent}"):
                     stat_boxes.append(gr.HTML(idle_stat))
                     vis_boxes.append(gr.HighlightedText(
