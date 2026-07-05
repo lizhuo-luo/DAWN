@@ -96,13 +96,14 @@ CSS = """
 .dawn-action-row button {height: 40px; flex: none;}
 .dawn-status {min-height: 40px; box-sizing: border-box;}
 
-/* Gradio 4.44 bug workaround: the per-component status tracker
-   (<div class="wrap ...">) lacks position:absolute in this release, so it sits
-   in normal flow and reserves a tall blank strip above every output while an
-   event runs — even with show_progress="hidden" it is merely opacity:0 and
-   still occupies space. We render our own status banner, so remove hidden
-   trackers from the layout entirely. */
+/* Gradio 4.44 quirks, verified against its compiled frontend CSS in a headless
+   browser: (1) keep hidden per-component status trackers out of the layout;
+   (2) while an event runs, gr.HTML wrappers get the `min` class, whose
+   min-height:var(--size-24) (96px) inflates the stat cards / status bar and
+   opens a blank strip above the lanes until the run finishes. Our HTML always
+   sizes itself, so drop the forced minimum. */
 .gradio-container .wrap.hide {display: none !important;}
+.gradio-container .prose.min {min-height: 0 !important;}
 
 /* ---------- racing lanes ---------- */
 .dawn-lane {
@@ -285,7 +286,7 @@ function refresh() {
 
 def build_demo():
     with gr.Blocks(title="DAWN Speed Race", theme=THEME, css=CSS,
-                   js=FORCE_LIGHT_JS) as demo:
+                   js=FORCE_LIGHT_JS, fill_width=True) as demo:
         gr.HTML(
             '<div class="dawn-header">'
             '<div class="dawn-header__title">DAWN Speed Race</div>'
