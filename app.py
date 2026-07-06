@@ -111,6 +111,18 @@ CSS = """
 }
 .dawn-lane--dawn {border: 2px solid #2da44e;}
 
+/* ---------- token stream (HighlightedText) ---------- */
+/* smaller text and tighter token chips; the longer eased color transition makes
+   each burst of committed tokens fade from masked-gray to its lane color instead
+   of popping frame by frame (the spans are reused across frames, so this works) */
+.dawn-lane .textfield {font-size: 12px !important; line-height: 1.55 !important;}
+.dawn-lane .textspan {
+  padding: 0.5px 3px !important; border-radius: 3px !important;
+  transition: background-color .3s ease, color .3s ease !important;
+}
+.dawn-lane .category-legend {font-size: 10.5px !important;}
+.dawn-lane .category-label {padding: 1px 6px !important;}
+
 /* ---------- stat card ---------- */
 .dawn-stat {padding: 2px 2px 6px;}
 .dawn-stat__head {display:flex; align-items:center; gap:8px;}
