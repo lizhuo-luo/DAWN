@@ -15,3 +15,4 @@ new_logs/
 llada/eval_para_anchor.sh
 llada/eval_para_attnsink.sh
 llada/eval_para_edge.sh
+.gradio
