@@ -188,12 +188,15 @@ CSS = """
   flex:1; text-align:left; padding: 8px 12px; border-radius: 6px;
   background: #f6f8fa; border:1px solid var(--border-color-primary);
 }
+/* the tile background is hardcoded light, so its text must not follow the
+   theme vars: in dark mode var(--body-text-color) is near-white and the
+   numbers vanish against #f6f8fa. Hardcode matching dark text instead. */
 .dawn-tile__l {
   font-size: 11px; font-family: ui-monospace, monospace;
-  color: var(--body-text-color-subdued); margin-bottom: 4px;
+  color: #57606a; margin-bottom: 4px;
 }
 .dawn-tile__v {
-  font-size: 16px; font-weight: 600; line-height: 1.1; color: var(--body-text-color);
+  font-size: 16px; font-weight: 600; line-height: 1.1; color: #1f2328;
   font-variant-numeric: tabular-nums; font-feature-settings: "tnum";
 }
 .dawn-tile__v span {font-size: 12px; font-weight:500; opacity:.6; margin-left:1px;}
