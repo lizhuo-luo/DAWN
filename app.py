@@ -101,6 +101,22 @@ CSS = """
 .gradio-container .wrap.hide {display: none !important;}
 .gradio-container .prose.min {min-height: 0 !important;}
 
+/* Gradio 6.x quirk (this edge env runs 6.17; 4.44 renders gr.HTML as a bare
+   div): every gr.HTML gets an .html-container wrapper carrying
+   padding: var(--block-padding). That inset makes the header card narrower
+   than the rows below it and pushes the status bar down/right out of line
+   with the Race/Clear buttons. Flatten the wrapper around our self-styled
+   HTML (tagged dawn-flat) — both where elem_classes lands on the container
+   itself and where it lands on a parent block. Harmless on 4.44. */
+.gradio-container .block.dawn-flat {
+  padding: 0 !important; border: none !important;
+  background: transparent !important; box-shadow: none !important;
+}
+.gradio-container .dawn-flat.html-container,
+.gradio-container .dawn-flat .html-container {
+  padding: 0 !important;
+}
+
 /* ---------- racing lanes ---------- */
 /* slim separation between the three lanes — just enough to tell them apart */
 .dawn-lanes {gap: 4px !important;}
@@ -122,6 +138,37 @@ CSS = """
 }
 .dawn-lane .category-legend {font-size: 10.5px !important;}
 .dawn-lane .category-label {padding: 1px 6px !important;}
+
+/* ---------- token stream, gradio 6.x ----------
+   HighlightedText was rewritten in gradio 6 (checked against the compiled CSS
+   shipped with 6.17.3): tokens render as .token chips with big default
+   margins (4px left / 8px right, plus padding) and a pointer cursor, laid out
+   as a flex-wrap list — the stream reads as a sparse grid of tags instead of
+   flowing text. Tighten the chips back into a compact stream. The 4.44
+   selectors above (.textspan/.category-legend) don't exist in 6.x and vice
+   versa, so both blocks coexist harmlessly. */
+.dawn-lane .token {
+  transition: background-color .3s ease, color .3s ease !important;
+  border-radius: 3px !important; cursor: text !important;
+}
+.dawn-lane .token.highlighted {
+  margin: 0 1px 1px 0 !important; padding: 0.5px 3px !important;
+}
+.dawn-lane .textfield {
+  font-size: 12px !important; line-height: 1.55 !important;
+  align-content: flex-start;
+}
+.dawn-lane .legend {font-size: 10.5px !important; gap: 4px !important;}
+.dawn-lane .legend-item {padding: 1px 6px !important;}
+
+/* ---------- lane height ----------
+   equal_height stretches EVERY direct child of the lane columns equally
+   (gradio's .stretch > .column > * {flex-grow: 1}), so the stat card's
+   wrapper grew too and opened a blank strip between the Tokens/TPS tiles and
+   the token stream. Pin every lane child to its natural height, then hand
+   all the remaining lane height to the stream (tagged dawn-stream). */
+.dawn-lane > * {flex-grow: 0 !important; flex-shrink: 0 !important;}
+.dawn-lane > .dawn-stream {flex-grow: 1 !important; min-height: 0;}
 
 /* ---------- stat card ---------- */
 .dawn-stat {padding: 2px 2px 6px;}
@@ -298,7 +345,8 @@ def build_demo():
     with gr.Blocks(title="DAWN Speed Race", theme=THEME, css=CSS,
                    js=FORCE_LIGHT_JS, fill_width=True) as demo:
         gr.HTML(
-            '<div class="dawn-header">'
+            elem_classes="dawn-flat",
+            value='<div class="dawn-header">'
             '<div class="dawn-header__title">DAWN Speed Race</div>'
             '<div class="dawn-header__sub">Dependency-Aware Fast Inference for '
             'Diffusion LLMs — the three decoding methods run sequentially on the '
@@ -343,7 +391,8 @@ def build_demo():
                                  min_width=110, elem_classes="dawn-race-btn")
             clear_btn = gr.Button("Clear", scale=0, min_width=90)
             with gr.Column(scale=10):
-                status = gr.HTML(status_html("Ready when you are.", "info"))
+                status = gr.HTML(status_html("Ready when you are.", "info"),
+                                 elem_classes="dawn-flat")
 
         idle = _idle_stats()
         vis_boxes, stat_boxes = [], []
@@ -351,10 +400,11 @@ def build_demo():
             for (_method, title, _sub, accent), idle_stat in zip(LANES, idle):
                 with gr.Column(scale=10, min_width=220,
                                elem_classes=f"dawn-lane dawn-lane--{accent}"):
-                    stat_boxes.append(gr.HTML(idle_stat))
+                    stat_boxes.append(gr.HTML(idle_stat, elem_classes="dawn-flat"))
                     vis_boxes.append(gr.HighlightedText(
                         label=f"{title} — denoising", combine_adjacent=False,
                         show_legend=True, color_map=COLOR_MAP,
+                        elem_classes="dawn-stream",
                     ))
 
         inputs = [

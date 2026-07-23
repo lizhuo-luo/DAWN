@@ -47,13 +47,15 @@ class LladaBackend:
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_path, trust_remote_code=True
         )
-        self.model = (
-            LLaDAModelLM.from_pretrained(
-                model_path, trust_remote_code=True, torch_dtype=torch.bfloat16
-            )
-            .to(device)
-            .eval()
-        )
+        # device_map streams each shard straight to the target device (and
+        # implies low_cpu_mem_usage). Loading to CPU then .to(device) briefly
+        # holds TWO full copies of the ~16GB bf16 weights — on unified-memory
+        # Jetson boards CPU and GPU draw from the same RAM, so that peak OOMs
+        # the NvMap allocator (error 12) even though the model itself fits.
+        self.model = LLaDAModelLM.from_pretrained(
+            model_path, trust_remote_code=True, torch_dtype=torch.bfloat16,
+            device_map={"": device},
+        ).eval()
         self.decode_token = make_decode_token(self.tokenizer)
         self.eos_id = self.tokenizer.eos_token_id
 

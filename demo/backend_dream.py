@@ -45,13 +45,13 @@ class DreamBackend:
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_path, trust_remote_code=True
         )
-        self.model = (
-            DreamModel.from_pretrained(
-                model_path, torch_dtype=torch.bfloat16, trust_remote_code=True
-            )
-            .eval()
-            .to(device)
-        )
+        # device_map streams each shard straight to the target device instead
+        # of loading to CPU and copying — halves the load-time memory peak,
+        # which matters on unified-memory Jetson boards (see backend_llada).
+        self.model = DreamModel.from_pretrained(
+            model_path, torch_dtype=torch.bfloat16, trust_remote_code=True,
+            device_map={"": device},
+        ).eval()
         # bind the local mixin's generation methods (mirrors eval.py)
         self.model.diffusion_generate = types.MethodType(
             DreamGenerationMixin.diffusion_generate, self.model

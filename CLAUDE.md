@@ -11,9 +11,12 @@ This repo is a research/evaluation harness, not a library. It wires DAWN (and se
 ## Setup & Commands
 
 ```bash
-pip install -r requirements.txt          # quick start
+pip install -r requirements.txt          # quick start (x86 + CUDA; also includes the demo deps: gradio, matplotlib, seaborn)
 pip install -r requirements-lock.txt     # reproducible (pins torch==2.5.1+cu121, transformers==4.49.0, lm_eval==0.4.8)
+pip install -r requirements.jetson.txt   # Jetson/ARM — inside nvcr.io/nvidia/pytorch:25.06-py3-igpu, which provides torch; do NOT pip-install torch there
 ```
+
+`requirements-arm.txt` is an identical copy of `requirements.jetson.txt`. A `requirements-demo.txt` referenced in some comments no longer exists — the demo deps were folded into the files above.
 
 Evaluation always requires these env vars (set in the eval `.sh` scripts):
 ```bash
@@ -42,6 +45,14 @@ python dream/postprocess_code.py <output_path>/samples_*.jsonl
 ```
 The `.sh` scripts leave a `# NOTICE: use postprocess ...` comment where this applies.
 
+### Web demo ("DAWN Speed Race")
+
+```bash
+python app.py    # from the repo root; Gradio UI on 0.0.0.0 with share=True
+```
+
+Races three decoding methods sequentially on one GPU — vanilla (1 token/step), parallel confidence-threshold, and DAWN — streaming each lane's denoising live with tokens/sec and speedup-vs-vanilla stats. Needs a CUDA GPU (~16GB+ for the 7–8B models in bf16); falls back to CPU with a warning.
+
 ## Architecture
 
 The two model directories (`llada/`, `dream/`) are **parallel, self-contained implementations of the same idea** — they do not import from each other. Pick the directory matching the model you are evaluating; expect to mirror any cross-cutting change in both.
@@ -64,6 +75,13 @@ So a DAWN step is: get attention from the model → remove sinks → build edge/
 
 ### Vendored models
 `llada/model/` and `dream/model/` are HF-style model definitions (`modeling_*.py`, `configuration_*.py`) adapted from the upstream LLaDA/Dream repos. The key local modification is that the forward pass can **return attention scores** (`return_attn_scores=...` / `output_attentions`) so DAWN can read the dependency signal — vanilla HF models don't expose this cheaply.
+
+### Demo (`app.py` + `demo/`)
+- `demo/registry.py` — the load-bearing piece. `llada/` and `dream/` both expose colliding top-level module names (`model`, `generate`, `gdllm_utils`, ...) with absolute imports, so they can't coexist on `sys.path`. The registry keeps exactly **one backend resident**: switching model family unloads the old model, purges the conflicting entries from `sys.modules`, and repoints `sys.path` at the right sub-repo. Consequence: backend modules (`demo/backend_llada.py`, `demo/backend_dream.py`) must do their heavy imports **inside `__init__`**, never at module import time.
+- The backends reuse the real decoding functions from `llada/generate.py` / `dream/model/generation_utils.py` (not reimplementations), yielding one update per decoding step for live streaming.
+- `demo/viz.py` — model-agnostic snapshot→`gr.HighlightedText` frame conversion and the stats/status HTML.
+- `DAWN_PRESETS` in `app.py` mirrors the eval-script hyperparameters per model; note LLaDA's dawn path uses `tau_low` (ignores `conf_threshold`) while Dream's uses `conf_threshold` (ignores `tau_low`).
+- The CSS/JS in `app.py` deliberately carries **dual compatibility blocks for Gradio 4.44 and Gradio 6** (the Jetson/edge environment runs 6.x, x86 runs 4.44) — the selectors don't overlap, so keep both when touching styles.
 
 ## Conventions
 
