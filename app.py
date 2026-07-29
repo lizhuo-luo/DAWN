@@ -168,7 +168,12 @@ CSS = """
    the token stream. Pin every lane child to its natural height, then hand
    all the remaining lane height to the stream (tagged dawn-stream). */
 .dawn-lane > * {flex-grow: 0 !important; flex-shrink: 0 !important;}
-.dawn-lane > .dawn-stream {flex-grow: 1 !important; min-height: 0;}
+/* 472px = 2x the 236px floor gradio's empty placeholder gives the stream
+   (.empty.large min-height: calc(var(--size-64) - 20px)). Setting it on the
+   stream itself keeps the lane at full height while tokens render too, not
+   just when idle. */
+.dawn-lane > .dawn-stream {flex-grow: 1 !important; min-height: 472px;}
+.dawn-lane .empty.large {min-height: 472px !important;}
 
 /* ---------- stat card ---------- */
 .dawn-stat {padding: 2px 2px 6px;}
@@ -358,12 +363,10 @@ def build_demo():
             '</div>'
         )
 
-        with gr.Row():
-            model_key = gr.Dropdown(
-                choices=list(MODELS.keys()), value=DEFAULT_MODEL, label="Model", scale=1
-            )
-            msg = gr.Textbox(label="Prompt", placeholder="Ask something…",
-                             autofocus=True, scale=4)
+        # the Model+Prompt row is rendered below the Race row; msg is created
+        # unrendered up here only because gr.Examples needs the reference
+        msg = gr.Textbox(label="Prompt", placeholder="Ask something…",
+                         autofocus=True, scale=4, render=False)
 
         with gr.Accordion("Examples", open=False):
             gr.Examples(examples=EXAMPLES, inputs=msg)
@@ -396,6 +399,12 @@ def build_demo():
             with gr.Column(scale=10):
                 status = gr.HTML(status_html("Ready when you are.", "info"),
                                  elem_classes="dawn-flat")
+
+        with gr.Row():
+            model_key = gr.Dropdown(
+                choices=list(MODELS.keys()), value=DEFAULT_MODEL, label="Model", scale=1
+            )
+            msg.render()
 
         idle = _idle_stats()
         vis_boxes, stat_boxes = [], []
